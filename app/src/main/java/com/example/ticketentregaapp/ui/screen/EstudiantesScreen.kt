@@ -1,23 +1,36 @@
 package com.example.ticketentregaapp.ui.screen
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.ticketentregaapp.R
 import com.example.ticketentregaapp.data.entity.EstudiantesEntity
 import com.example.ticketentregaapp.ui.viewmodel.EstudiantesViewModel
 import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,13 +45,9 @@ fun EstudiantesScreen(
 
     val items by viewModel.items.collectAsState()
 
-    LaunchedEffect(searchQuery) {
-        viewModel.setSearchQuery(searchQuery)
-    }
+    LaunchedEffect(searchQuery) { viewModel.setSearchQuery(searchQuery) }
+    LaunchedEffect(sortByNombre) { viewModel.setSortByNombre(sortByNombre) }
 
-    LaunchedEffect(sortByNombre) {
-        viewModel.setSortByNombre(sortByNombre)
-    }
 
     if (showForm) {
         EstudiantesFormScreen(
@@ -54,82 +63,172 @@ fun EstudiantesScreen(
             }
         )
     } else {
+
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Estudiantes") },
+                    title = {
+                        Text(
+                            "Estudiantes",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     navigationIcon = {
-                        TextButton(onClick = onBack) {
-                            Text("Salir")
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White
+                    )
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(onClick = {
-                    editingItem = null
-                    showForm = true
-                }) {
-                    Text("+")
+                FloatingActionButton(
+                    onClick = {
+                        editingItem = null
+                        showForm = true
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar")
                 }
             }
         ) { padding ->
-            Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-                TextField(
+
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(20.dp)
+                    .animateContentSize()
+            ) {
+
+                // -----------------------------
+                //      BUSCADOR PREMIUM
+                // -----------------------------
+                OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    label = { Text("Buscar") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("Buscar estudiante") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
 
-                Row {
-                    Text("Ordenar por: ")
-                    TextButton(onClick = { sortByNombre = false }) {
-                        Text(if (!sortByNombre) "Código ✓" else "Código")
-                    }
-                    TextButton(onClick = { sortByNombre = true }) {
-                        Text(if (sortByNombre) "Nombre ✓" else "Nombre")
-                    }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --------------------------------------
+                //          CHIPS DE FILTRO BONITOS
+                // --------------------------------------
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    FilterChip(
+                        selected = !sortByNombre,
+                        onClick = { sortByNombre = false },
+                        label = { Text("Código") },
+                        leadingIcon = {
+                            if (!sortByNombre) Icon(Icons.Default.CheckCircle, null)
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    FilterChip(
+                        selected = sortByNombre,
+                        onClick = { sortByNombre = true },
+                        label = { Text("Nombre") },
+                        leadingIcon = {
+                            if (sortByNombre) Icon(Icons.Default.CheckCircle, null)
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
+
+                // --------------------------------------
+                //        LISTA CON CARDS DINÁMICAS
+                // --------------------------------------
                 LazyColumn {
                     items(items) { item ->
+
                         val isInactive = item.estadoRegistro == "I"
+
+                        val bgColor by animateColorAsState(
+                            targetValue = if (isInactive)
+                                Color(0xFFF1E9E9)
+                            else
+                                MaterialTheme.colorScheme.surface,
+                            animationSpec = tween(400)
+                        )
+
+                        val scaleAnim by animateFloatAsState(
+                            targetValue = if (isInactive) 0.96f else 1f,
+                            animationSpec = tween(400)
+                        )
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 8.dp)
+                                .scale(scaleAnim)
                                 .clickable {
                                     editingItem = item
                                     showForm = true
                                 },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isInactive)
-                                    Color.LightGray.copy(alpha = 0.3f)
-                                else
-                                    MaterialTheme.colorScheme.surface
-                            )
+                            shape = RoundedCornerShape(22.dp),
+                            elevation = CardDefaults.cardElevation(6.dp),
+                            colors = CardDefaults.cardColors(containerColor = bgColor)
                         ) {
-                            Row(modifier = Modifier.padding(16.dp)) {
-                                Column(modifier = Modifier.weight(1f)) {
+
+                            Row(
+                                modifier = Modifier.padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(50.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(Modifier.weight(1f)) {
                                     Text(
                                         "Código: ${item.codigo}",
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (isInactive) Color.Gray else Color.Unspecified
+                                        fontWeight = FontWeight.Bold
                                     )
-                                    Text(
-                                        "Nombre: ${item.nombre}",
-                                        color = if (isInactive) Color.Gray else Color.Unspecified
-                                    )
+                                    Text(item.nombre)
                                 }
+
                                 if (isInactive) {
                                     Text(
                                         "INACTIVO",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Red
+                                        color = Color.Red,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -140,7 +239,7 @@ fun EstudiantesScreen(
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EstudiantesFormScreen(
     viewModel: EstudiantesViewModel,
@@ -151,139 +250,157 @@ fun EstudiantesFormScreen(
     var codigo by remember { mutableStateOf(item?.codigo ?: "") }
     var nombre by remember { mutableStateOf(item?.nombre ?: "") }
     var errorMessage by remember { mutableStateOf("") }
+
     val scope = rememberCoroutineScope()
+
     val isEditing = item != null
     val isInactive = item?.estadoRegistro == "I"
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(48.dp)
-    ) {
-        Text(
-            text = if (isEditing) {
-                if (isInactive) "Estudiante Inactivo" else "Editar Estudiante"
-            } else {
-                "Nuevo Estudiante"
-            },
-            style = MaterialTheme.typography.headlineSmall,
-            color = if (isInactive) Color.Gray else Color.Unspecified
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextField(
-            value = codigo,
-            onValueChange = {
-                codigo = it
-                errorMessage = ""
-            },
-            label = { Text("Código") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isEditing && !isInactive,
-            isError = errorMessage.isNotEmpty(),
-            supportingText = if (errorMessage.isNotEmpty()) {
-                { Text(errorMessage, color = Color.Red) }
-            } else null
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextField(
-            value = nombre,
-            onValueChange = { nombre = it },
-            label = { Text("Nombre") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isInactive
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Imagen decorativa - Coloca tu imagen en res/drawable/estudiante_icon.png
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.Center
-        ) {
-                Image(
-                    painter = painterResource(id = R.drawable.studen2),
-                    contentDescription = "Icono Estudiante",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        if (isEditing) "Editar Estudiante" else "Nuevo Estudiante",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Cancelar")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
                 )
+            )
         }
+    ) { padding ->
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(24.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
 
-        if (!isInactive) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = {
-                        if (codigo.isBlank() || nombre.isBlank()) {
-                            errorMessage = "Todos los campos son obligatorios"
-                            return@Button
-                        }
+            OutlinedTextField(
+                value = codigo,
+                onValueChange = {
+                    codigo = it
+                    errorMessage = ""
+                },
+                label = { Text("Código") },
+                enabled = !isEditing && !isInactive,
+                isError = errorMessage.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            )
 
-                        scope.launch {
-                            if (!isEditing && viewModel.codigoExists(codigo)) {
-                                errorMessage = "El código '$codigo' ya existe. Ingrese otro código."
-                                return@launch
-                            }
+            OutlinedTextField(
+                value = nombre,
+                onValueChange = { nombre = it },
+                label = { Text("Nombre") },
+                enabled = !isInactive,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            )
 
-                            if (isEditing) {
-                                viewModel.update(EstudiantesEntity(codigo, nombre, item!!.estadoRegistro))
-                            } else {
-                                viewModel.insert(EstudiantesEntity(codigo, nombre, "A"))
-                            }
-                            onSave()
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Guardar")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = onCancel,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Cancelar")
-                }
+            if (errorMessage.isNotEmpty()) {
+                Text(errorMessage, color = Color.Red)
             }
 
-            if (isEditing) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                viewModel.delete(codigo)
-                                onSave()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("Eliminar")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+
+            if (!isInactive) {
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 
                     Button(
                         onClick = {
+                            if (codigo.isBlank() || nombre.isBlank()) {
+                                errorMessage = "Todos los campos son obligatorios"
+                                return@Button
+                            }
+
                             scope.launch {
-                                viewModel.inactivate(codigo)
+                                if (!isEditing && viewModel.codigoExists(codigo)) {
+                                    errorMessage = "El código ya existe"
+                                    return@launch
+                                }
+
+                                if (isEditing) {
+                                    viewModel.update(
+                                        EstudiantesEntity(
+                                            codigo,
+                                            nombre,
+                                            item!!.estadoRegistro
+                                        )
+                                    )
+                                } else {
+                                    viewModel.insert(EstudiantesEntity(codigo, nombre, "A"))
+                                }
                                 onSave()
                             }
                         },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Inactivar")
+                        Text("Guardar")
+                    }
+
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancelar")
                     }
                 }
-            }
-        } else {
-            // Opciones para registros inactivos
-            Row(modifier = Modifier.fillMaxWidth()) {
+
+                if (isEditing) {
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    viewModel.delete(codigo)
+                                    onSave()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Eliminar")
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    viewModel.inactivate(codigo)
+                                    onSave()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(
+                                    0xFFFF9800
+                                )
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Inactivar")
+                        }
+                    }
+                }
+
+            } else {
+
                 Button(
                     onClick = {
                         scope.launch {
@@ -291,12 +408,13 @@ fun EstudiantesFormScreen(
                             onSave()
                         }
                     },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    Icon(Icons.Default.CheckCircle, null)
+                    Spacer(Modifier.width(6.dp))
                     Text("Activar")
                 }
-                Spacer(modifier = Modifier.width(8.dp))
 
                 Button(
                     onClick = {
@@ -305,20 +423,20 @@ fun EstudiantesFormScreen(
                             onSave()
                         }
                     },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    Icon(Icons.Default.Delete, null)
+                    Spacer(Modifier.width(6.dp))
                     Text("Eliminar")
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Cancelar")
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cancelar")
+                }
             }
         }
     }
